@@ -31,7 +31,7 @@ Model after `robots/lekiwi/lekiwi_host.py` + `lekiwi_client.py` (PUSH/PULL for a
    - Round 1: ~10 episodes per task × 6 tasks = 60 episodes, with small variation in block pose/orientation at the start spot.
    - Record with a task string per episode (`"move block from A to B"` etc.) in one dataset; ~15–20 s episodes.
    - Round 2: after we eval round 1 and see failure modes, record targeted extra demos on the weak tasks.
-5. **Train (desktop GPU):** start with **ACT** (fast, reliable for single-task pick/place) — but ACT is not language-conditioned, so choose one of:
+5. **Train (Framework 13, Ryzen 7 7640U, no NVIDIA GPU):** training is CPU-bound or experimental ROCm on the 780M iGPU, so budget for it: use **ACT** only (small, ~50M params), low-res images (e.g. 224x224 or smaller), small batch, and expect hours per run. SmolVLA is out of reach locally; if we need it, rent a cloud GPU for a few hours. Original notes follow. Start with **ACT** (fast, reliable for single-task pick/place) — but ACT is not language-conditioned, so choose one of:
    - (a) six separate ACT policies (simplest, most reliable), or
    - (b) one task-conditioned policy: **SmolVLA** (fine-tune, language prompt selects the route). Preferred if GPU has ≥ 16 GB; try after ACT baseline.
 6. **Autonomous loop (me):** evaluate each route N=10 via the bridge with a human reset (or A↔B↔C chained runs so each success sets up the next), log success rate per route, then collect policy-rollout data / DAgger-style corrections where possible, retrain, repeat until ≥ 80% per route.
@@ -39,14 +39,13 @@ Model after `robots/lekiwi/lekiwi_host.py` + `lekiwi_client.py` (PUSH/PULL for a
 
 ## Open questions
 
-- Desktop GPU model/VRAM (decides ACT vs SmolVLA)?
-- Pi ↔ desktop connection: Wi-Fi or Ethernet? Static IPs?
-- Are leader and follower on the same Pi USB hub (two serial ports)?
+- Pi is on a separate Wi-Fi network the laptop joins: expect 10-50 ms jitter, so use JPEG q~70 at 640x480 or lower and CONFLATE sockets; give the Pi a static IP/hostname.
+- Optional: cloud GPU for the heavier training runs.
 - Can the block be reset by hand between eval trials (yes assumed), or should eval chain routes?
 - Camera resolution / fps the Pi can sustain with two cameras.
 
 ## Next steps
 
 1. You pull the repo on the Pi and confirm hardware + calibration.
-2. I build `so101_zmq` host/client under `src/lerobot/robots/so101_zmq/` and a latency test.
+2. Reuse `src/lerobot/utils/zmq_utils.py` (your helper, moved off the shadowing `utils/zmq.py` name; `np.fromstring` -> `np.frombuffer`) for pub/sub of images and state. I build `so101_zmq` host/client under `src/lerobot/robots/so101_zmq/` and a latency test.
 3. Then we record the first 60 episodes.
