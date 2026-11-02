@@ -3,7 +3,6 @@ import base64
 import pickle
 import threading
 
-import blosc as bl
 import cv2
 import numpy as np
 import zmq
@@ -101,6 +100,8 @@ class ZMQCameraSubscriber(threading.Thread):
         return cv2.imdecode(encoded_data, 1), data["timestamp"]
 
     def recv_depth_image(self):
+        import blosc as bl  # optional dependency, depth only
+
         raw_data = self.socket.recv()
         striped_data = raw_data.lstrip(b"depth_image ")
         data = pickle.loads(striped_data)
@@ -133,6 +134,8 @@ class ZMQCameraPublisher(object):
         self.socket.send(b"rgb_image " + pickle.dumps(data, protocol=-1))
 
     def pub_depth_image(self, depth_image, timestamp):
+        import blosc as bl  # optional dependency, depth only
+
         compressed_depth = bl.pack_array(
             depth_image, cname="zstd", clevel=1, shuffle=bl.NOSHUFFLE
         )
