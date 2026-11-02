@@ -156,7 +156,7 @@ class SO101ZmqHost:
         if self.mode == "teleop" and leader_pos is not None:
             self.goal = {f"{j}.pos": leader_pos[f"{j}.pos"] for j in JOINTS}
         elif self.mode == "policy":
-            if time.monotonic() - self.last_cmd_t > self.cfg.watchdog_ms / 1000:
+            if not self.queue and time.monotonic() - self.last_cmd_t > self.cfg.watchdog_ms / 1000:
                 logging.warning("watchdog: no command from laptop, holding position (mode -> idle)")
                 self.mode = "idle"
                 self.queue.clear()
