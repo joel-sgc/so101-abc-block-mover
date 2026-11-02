@@ -96,6 +96,9 @@ class SO101ZmqHost:
 
         self.mode = cfg.start_mode
         self.queue: deque[dict[str, float]] = deque()
+        self.chunk_t0 = time.monotonic()
+        self.popped = 0
+        self.timing: dict[str, float] = dict.fromkeys(("cmd", "leader", "drive", "obs", "enc", "send"), 0.0)
         self.goal: dict[str, float] | None = None  # last goal sent to the motors
         self.last_chunk_id = -1
         self.pong: int | None = None
@@ -127,6 +130,8 @@ class SO101ZmqHost:
             self.queue = deque(
                 dict(zip((f"{j}.pos" for j in JOINTS), map(float, a), strict=True)) for a in msg["actions"]
             )
+            self.chunk_t0 = time.monotonic()
+            self.popped = 0
             self.last_chunk_id = int(msg["id"])
         elif kind == "mode":
             if msg["mode"] in MODES:
@@ -161,7 +166,13 @@ class SO101ZmqHost:
                 self.mode = "idle"
                 self.queue.clear()
             elif self.queue:
-                self.goal = self.queue.popleft()
+                # Play by wall clock: if the loop runs slower than `fps`, skip ahead so durations stay true.
+                due = int((time.monotonic() - self.chunk_t0) * self.cfg.fps) + 1 - self.popped
+                for _ in range(max(1, due)):
+                    if not self.queue:
+                        break
+                    self.goal = self.queue.popleft()
+                    self.popped += 1
         if self.mode != "idle" and self.goal is not None:
             self.follower.send_action(self.goal)
 
@@ -184,10 +195,14 @@ class SO101ZmqHost:
         while not self.stop:
             t0 = time.perf_counter()
             self._poll_commands()
+            t1 = time.perf_counter()
             leader_pos = self.leader.get_action() if (self.leader and self.mode == "teleop") else None
+            t2 = time.perf_counter()
             self._drive(leader_pos)
+            t3 = time.perf_counter()
 
             obs = self.follower.get_observation()
+            t4 = time.perf_counter()
             header = {j: float(obs[j]) for j in obs if j.endswith(".pos")}
             if leader_pos is not None:
                 header.update({f"leader.{k}": float(v) for k, v in leader_pos.items()})
@@ -195,10 +210,18 @@ class SO101ZmqHost:
             if self.pong is not None:
                 header["pong"], self.pong = self.pong, None
             frames = self._encode(obs) if tick % img_every == 0 else []
+            t5 = time.perf_counter()
             header["_cams"] = ["wrist", "front"] if frames else []
             with contextlib.suppress(zmq.Again):
                 self.obs_sock.send_multipart([json.dumps(header).encode(), *frames], zmq.NOBLOCK)
+            t6 = time.perf_counter()
+            for k, v in zip(self.timing, (t1 - t0, t2 - t1, t3 - t2, t4 - t3, t5 - t4, t6 - t5), strict=True):
+                self.timing[k] += v
             tick += 1
+            if tick % 100 == 0:
+                avg = {k: round(v * 10, 1) for k, v in self.timing.items()}  # ms per tick
+                print(f"[host] avg ms/tick {avg} mode={self.mode}", flush=True)
+                self.timing = dict.fromkeys(self.timing, 0.0)
             time.sleep(max(0.0, period - (time.perf_counter() - t0)))
 
 
