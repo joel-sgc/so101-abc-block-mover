@@ -206,6 +206,8 @@ class SO101Zmq(Robot):
         """Queue [N, 6] joint goals (order = JOINTS). Replaces whatever the Pi had left. Returns chunk id."""
         actions = np.asarray(actions, dtype=np.float64).reshape(-1, len(JOINTS))
         self._chunk_id += 1
+        # A chunk always means "drive the arm": the host may have dropped to idle via its watchdog.
+        self._send({"type": "mode", "mode": "policy"})
         self._send({"type": "chunk", "id": self._chunk_id, "actions": actions.tolist()})
         return self._chunk_id
 
