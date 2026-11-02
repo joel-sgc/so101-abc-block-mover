@@ -46,6 +46,10 @@ def make_robot_from_config(config: RobotConfig) -> Robot:
         from .lekiwi import LeKiwi
 
         return LeKiwi(config)
+    elif config.type == "so101_zmq":
+        from .so101_zmq import SO101Zmq
+
+        return SO101Zmq(config)
     elif config.type == "hope_jr_hand":
         from .hope_jr import HopeJrHand
 
