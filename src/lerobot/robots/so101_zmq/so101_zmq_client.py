@@ -103,7 +103,9 @@ class SO101Zmq(Robot):
         self.cmd_sock.setsockopt(zmq.LINGER, 0)
         self.cmd_sock.connect(f"tcp://{self.config.remote_ip}:{self.config.port_cmd}")
         self.obs_sock = self.ctx.socket(zmq.SUB)
-        self.obs_sock.setsockopt(zmq.RCVHWM, 2)
+        # Large on purpose: with a tiny HWM zmq leaves a stale backlog in the TCP buffers and each read only gets
+        # the oldest couple of messages. _drain() empties the queue and keeps only the newest.
+        self.obs_sock.setsockopt(zmq.RCVHWM, 1000)
         self.obs_sock.setsockopt(zmq.SUBSCRIBE, b"")
         self.obs_sock.connect(f"tcp://{self.config.remote_ip}:{self.config.port_obs}")
 
@@ -145,21 +147,18 @@ class SO101Zmq(Robot):
     def _drain(self, timeout_ms: int) -> bool:
         """Read every pending observation, keep the newest header and newest frame per camera."""
         got = False
+        newest_jpegs: dict[str, bytes] = {}
         if not self.obs_sock.poll(timeout_ms):
             return False
         while True:
             try:
                 parts = self.obs_sock.recv_multipart(zmq.NOBLOCK)
             except zmq.Again:
-                return got
+                break
             try:
                 header = json.loads(parts[0])
                 names = header.pop("_cams", [])
-                # Frames are RGB on the Pi and are encoded as-is, so decode needs no colour conversion.
-                for name, jpeg in zip(names, parts[1:], strict=True):
-                    img = cv2.imdecode(np.frombuffer(jpeg, np.uint8), cv2.IMREAD_COLOR)
-                    if img is not None:
-                        self.last_frames[name] = img
+                newest_jpegs.update(zip(names, parts[1:], strict=True))
             except (json.JSONDecodeError, ValueError):
                 continue
             if "pong" in header:
@@ -168,6 +167,12 @@ class SO101Zmq(Robot):
                     self.last_rtt_s = time.monotonic() - sent
             self.last_header = header
             got = True
+        # Frames are RGB on the Pi and are encoded as-is, so decode needs no colour conversion.
+        for name, jpeg in newest_jpegs.items():
+            img = cv2.imdecode(np.frombuffer(jpeg, np.uint8), cv2.IMREAD_COLOR)
+            if img is not None:
+                self.last_frames[name] = img
+        return got
 
     @check_if_not_connected
     def get_observation(self) -> RobotObservation:
