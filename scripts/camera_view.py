@@ -51,7 +51,7 @@ def make_handler(grabbers, fps):
         def do_GET(self):
             if self.path == "/":
                 body = "<body style='background:#111;color:#eee;font-family:sans-serif'><h3>SO-101 cameras</h3>" + "".join(
-                    f"<div style='display:inline-block;margin:6px'><div>{n}</div><img src='/s/{i}' width=640></div>"
+                    f"<div style='display:inline-block;margin:6px'><div>{n}</div><img src='/s/{i}' width=800></div>"
                     for i, n in enumerate(names)
                 )
                 self.send_response(200)
@@ -80,8 +80,8 @@ def make_handler(grabbers, fps):
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=8080)
-    ap.add_argument("--width", type=int, default=640)
-    ap.add_argument("--height", type=int, default=480)
+    ap.add_argument("--width", type=int, default=1280)
+    ap.add_argument("--height", type=int, default=720)
     ap.add_argument("--fps", type=int, default=15, help="stream rate to the browser")
     ap.add_argument("--quality", type=int, default=70)
     a = ap.parse_args()
