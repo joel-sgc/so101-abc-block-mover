@@ -74,7 +74,7 @@ class SO101ZmqHostConfig:
 class SO101ZmqConfig(RobotConfig):
     """Runs on the laptop; talks to `so101_zmq_host` on the Pi."""
 
-    remote_ip: str = "thanos"
+    remote_ip: str = "10.42.0.194"  # Pi over the direct ethernet cable
     port_cmd: int = 5555
     port_obs: int = 5556
     cameras: dict[str, CameraConfig] = field(default_factory=stream_cameras_config)

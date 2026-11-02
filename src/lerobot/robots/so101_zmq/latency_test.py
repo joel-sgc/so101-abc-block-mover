@@ -1,6 +1,6 @@
 """Measure link quality to the Pi host: observation rate, ping RTT and image freshness. Moves nothing.
 
-uv run python -m lerobot.robots.so101_zmq.latency_test --remote_ip thanos --seconds 20
+uv run python -m lerobot.robots.so101_zmq.latency_test --remote_ip 10.42.0.194 --seconds 20
 """
 
 import argparse
@@ -14,7 +14,7 @@ from .so101_zmq_client import SO101Zmq
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--remote_ip", default="thanos")
+    ap.add_argument("--remote_ip", default="10.42.0.194")
     ap.add_argument("--seconds", type=float, default=20)
     args = ap.parse_args()
 
